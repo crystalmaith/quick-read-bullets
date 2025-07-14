@@ -1,18 +1,36 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader, Settings, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Summarizer } from "./Summarizer";
 
 export const TextSummarizer = () => {
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState("");
+  const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gpt-3.5-turbo'>('gpt-4o');
   const { toast } = useToast();
+  const summarizerRef = useRef<Summarizer | null>(null);
+
+  const initializeSummarizer = () => {
+    if (!summarizerRef.current && apiKey.trim()) {
+      summarizerRef.current = new Summarizer({
+        apiKey: apiKey.trim(),
+        model: selectedModel
+      });
+    } else if (summarizerRef.current) {
+      summarizerRef.current.updateConfig({
+        apiKey: apiKey.trim(),
+        model: selectedModel
+      });
+    }
+  };
 
   const summarizeText = async () => {
     if (!inputText.trim()) {
@@ -37,53 +55,29 @@ export const TextSummarizer = () => {
     setSummary([]);
 
     try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a text summarizer. Create exactly 3 concise bullet points that capture the main ideas of the given text. Return only the bullet points, each starting with "•" and separated by newlines.'
-            },
-            {
-              role: 'user',
-              content: `Please summarize this text in exactly 3 bullet points:\n\n${inputText}`
-            }
-          ],
-          max_tokens: 300,
-          temperature: 0.7,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
+      // Initialize or update the summarizer
+      initializeSummarizer();
+      
+      if (!summarizerRef.current) {
+        throw new Error("Failed to initialize summarizer");
       }
 
-      const data = await response.json();
-      const summaryText = data.choices[0]?.message?.content || "";
-      
-      // Split the summary into bullet points
-      const bulletPoints = summaryText
-        .split('\n')
-        .filter(line => line.trim().startsWith('•'))
-        .map(line => line.trim().substring(1).trim());
+      const result = await summarizerRef.current.generateSummary(inputText);
 
-      setSummary(bulletPoints);
-      
-      toast({
-        title: "Success",
-        description: "Text summarized successfully!",
-      });
+      if (result.success) {
+        setSummary(result.summary);
+        toast({
+          title: "Success",
+          description: `Text summarized successfully using ${selectedModel}!`,
+        });
+      } else {
+        throw new Error(result.error || "Summarization failed");
+      }
     } catch (error) {
       console.error('Error summarizing text:', error);
       toast({
         title: "Error",
-        description: "Failed to summarize text. Please check your API key and try again.",
+        description: error instanceof Error ? error.message : "Failed to summarize text. Please check your API key and try again.",
         variant: "destructive",
       });
     } finally {
@@ -94,9 +88,12 @@ export const TextSummarizer = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-2">Text Summarizer</h1>
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Zap className="h-8 w-8 text-primary" />
+          <h1 className="text-4xl font-bold">Text Summarizer</h1>
+        </div>
         <p className="text-muted-foreground">
-          Transform long articles and essays into clean 3-bullet summaries using GPT-4
+          Transform long articles and essays into clean 3-bullet summaries using advanced AI models
         </p>
       </div>
 
@@ -104,12 +101,28 @@ export const TextSummarizer = () => {
         {/* Input Section */}
         <Card>
           <CardHeader>
-            <CardTitle>User Input</CardTitle>
+            <div className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              <CardTitle>Summarizer Configuration</CardTitle>
+            </div>
             <CardDescription>
-              Paste your article or text here
+              Configure your AI model and paste your content
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="model-select">AI Model</Label>
+              <Select value={selectedModel} onValueChange={(value: 'gpt-4o' | 'gpt-3.5-turbo') => setSelectedModel(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select AI model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-4o">GPT-4 (Recommended)</SelectItem>
+                  <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="api-key">OpenAI API Key</Label>
               <Input
@@ -143,10 +156,10 @@ export const TextSummarizer = () => {
               {isLoading ? (
                 <>
                   <Loader className="mr-2 h-4 w-4 animate-spin" />
-                  Summarizing...
+                  Processing with {selectedModel}...
                 </>
               ) : (
-                "Generate Summary"
+                `Generate Summary with ${selectedModel}`
               )}
             </Button>
           </CardContent>
@@ -195,10 +208,10 @@ export const TextSummarizer = () => {
         <CardContent className="pt-6">
           <div className="text-center text-sm text-muted-foreground">
             <p className="mb-2">
-              <strong>How it works:</strong> This tool uses GPT-4 to analyze your text and extract the 3 most important points.
+              <strong>LLM Block "Summarizer":</strong> This tool uses a modular AI approach with GPT-4 or GPT-3.5 to analyze your text and extract the 3 most important points.
             </p>
             <p>
-              For secure API key storage and backend functionality, consider connecting to Supabase.
+              Model selection allows you to choose between accuracy (GPT-4) and speed (GPT-3.5). For secure API key storage and backend functionality, consider connecting to Supabase.
             </p>
           </div>
         </CardContent>
