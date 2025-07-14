@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader, Settings, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Summarizer } from "./Summarizer";
+import { SummaryOutput } from "./SummaryOutput";
 
 export const TextSummarizer = () => {
   const [inputText, setInputText] = useState("");
@@ -17,6 +18,7 @@ export const TextSummarizer = () => {
   const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gpt-3.5-turbo'>('gpt-4o');
   const { toast } = useToast();
   const summarizerRef = useRef<Summarizer | null>(null);
+  const [wordCount, setWordCount] = useState(0);
 
   const initializeSummarizer = () => {
     if (!summarizerRef.current && apiKey.trim()) {
@@ -33,6 +35,9 @@ export const TextSummarizer = () => {
   };
 
   const summarizeText = async () => {
+    // Calculate word count
+    const words = inputText.trim().split(/\s+/).filter(word => word.length > 0);
+    setWordCount(words.length);
     if (!inputText.trim()) {
       toast({
         title: "Error",
@@ -165,42 +170,13 @@ export const TextSummarizer = () => {
           </CardContent>
         </Card>
 
-        {/* Output Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Summary</CardTitle>
-            <CardDescription>
-              3-bullet point summary of your text
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-[300px]">
-                <div className="text-center">
-                  <Loader className="h-8 w-8 animate-spin mx-auto mb-2" />
-                  <p className="text-muted-foreground">Generating summary...</p>
-                </div>
-              </div>
-            ) : summary.length > 0 ? (
-              <div className="space-y-4">
-                <ul className="space-y-3">
-                  {summary.map((point, index) => (
-                    <li key={index} className="flex items-start space-x-2">
-                      <span className="text-primary font-bold mt-1">•</span>
-                      <span className="text-foreground leading-relaxed">{point}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-[300px]">
-                <p className="text-muted-foreground text-center">
-                  Your summary will appear here after processing
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Summary Output Block */}
+        <SummaryOutput 
+          summary={summary}
+          isLoading={isLoading}
+          model={selectedModel}
+          wordCount={wordCount}
+        />
       </div>
 
       {/* Info Section */}
@@ -208,10 +184,10 @@ export const TextSummarizer = () => {
         <CardContent className="pt-6">
           <div className="text-center text-sm text-muted-foreground">
             <p className="mb-2">
-              <strong>LLM Block "Summarizer":</strong> This tool uses a modular AI approach with GPT-4 or GPT-3.5 to analyze your text and extract the 3 most important points.
+              <strong>Connected Blocks:</strong> Input Block → Summarizer LLM Block → Summary Output Block
             </p>
             <p>
-              Model selection allows you to choose between accuracy (GPT-4) and speed (GPT-3.5). For secure API key storage and backend functionality, consider connecting to Supabase.
+              The Summary Output block displays processed results from the Summarizer with status indicators, model information, and compression metrics. For secure API key storage and backend functionality, consider connecting to Supabase.
             </p>
           </div>
         </CardContent>
