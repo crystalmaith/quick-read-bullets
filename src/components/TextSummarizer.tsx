@@ -14,20 +14,21 @@ export const TextSummarizer = () => {
   const [inputText, setInputText] = useState("");
   const [summary, setSummary] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState("");
   const [selectedModel, setSelectedModel] = useState<'gpt-4o' | 'gpt-3.5-turbo'>('gpt-4o');
   const { toast } = useToast();
   const summarizerRef = useRef<Summarizer | null>(null);
   const [wordCount, setWordCount] = useState(0);
 
   const initializeSummarizer = () => {
-    if (!summarizerRef.current) {
+    if (!summarizerRef.current && apiKey.trim()) {
       summarizerRef.current = new Summarizer({
-        apiKey: 'your-api-key-here', // This would typically come from backend/env
+        apiKey: apiKey.trim(),
         model: selectedModel
       });
     } else if (summarizerRef.current) {
       summarizerRef.current.updateConfig({
-        apiKey: 'your-api-key-here', // This would typically come from backend/env
+        apiKey: apiKey.trim(),
         model: selectedModel
       });
     }
@@ -41,6 +42,15 @@ export const TextSummarizer = () => {
       toast({
         title: "Error",
         description: "Please enter some text to summarize.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter your OpenAI API key.",
         variant: "destructive",
       });
       return;
@@ -72,7 +82,7 @@ export const TextSummarizer = () => {
       console.error('Error summarizing text:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to summarize text. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to summarize text. Please check your API key and try again.",
         variant: "destructive",
       });
     } finally {
@@ -119,6 +129,20 @@ export const TextSummarizer = () => {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="api-key">OpenAI API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your API key is stored locally and never sent to our servers
+              </p>
+            </div>
+            
+            <div className="space-y-2">
               <Label htmlFor="input-text">Text to Summarize</Label>
               <Textarea
                 id="input-text"
@@ -163,7 +187,7 @@ export const TextSummarizer = () => {
               <strong>Connected Blocks:</strong> Input Block → Summarizer LLM Block → Summary Output Block
             </p>
             <p>
-              The Summary Output block displays processed results from the Summarizer with status indicators, model information, and compression metrics. API key management should be handled securely through backend services like Supabase.
+              The Summary Output block displays processed results from the Summarizer with status indicators, model information, and compression metrics. For secure API key storage and backend functionality, consider connecting to Supabase.
             </p>
           </div>
         </CardContent>
